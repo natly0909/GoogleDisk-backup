@@ -11,7 +11,7 @@ mysqldump -uuser_teach -pCObTJo0vV user_kse | /usr/bin/gzip > /home/user/domains
 rclone delete gdrive:backups --min-age 3d --include "moodle*.tar.gz"
 rclone delete gdrive:backups --min-age 3d --include "moodle*.sql.gz"
 
-rclone sync /home/user/domains/private gdrive:backups/moodledata \
+rclone copy /home/user/domains/private gdrive:backups/moodledata \
   --exclude "cache/**" \
   --exclude "localcache/**" \
   --exclude "temp/**" \
