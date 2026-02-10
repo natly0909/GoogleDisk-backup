@@ -1,24 +1,37 @@
-#!/bin/bash
+!/bin/bash
 
 DATE=$(date +%Y-%m-%d)
 
-rm -f /home/user/domains/backup/moodle*.sql.gz
-rm -f /home/user/domains/backup/moodle*.tar.gz
+rm -f /home/user/domains/backup/moodle_${DATE}.sql.gz
+rm -f /home/user/domains/backup/moodle_${DATE}.tar.gz
+rm -f /home/user/domains/backup/moodledata_${DATE}.tar.gz.part*
 
-tar -czf /home/user/domains/backup/moodle_${DATE}.tar.gz /home/user/domains/teaching.kse.org.ua/public_html
-time mysqldump -uuser_teach -pCObTJo0vV user_kse  --single-transaction --quick| /usr/bin/gzip > /home/user/domains/backup/moodle_${DATE}.sql.gz
+time tar -czf /home/user/domains/backup/moodle_${DATE}.tar.gz \
+  /home/user/domains/teaching.kse.org.ua/public_html
+
+time mysqldump -uuser_teach -p'CObTJo0vV' user_kse \
+  --single-transaction --quick \
+| /usr/bin/gzip > /home/user/domains/backup/moodle_${DATE}.sql.gz
+
+time bash -c "tar -cf - -C /home/user/domains/private . \
+  --exclude='cache/*' \
+  --exclude='localcache/*' \
+  --exclude='temp/*' \
+  --exclude='trashdir/*' \
+  --exclude='lock/*' \
+| gzip \
+| split -d -b 29000m - /home/user/domains/backup/moodledata_${DATE}.tar.gz.part"
 
 rclone delete gdrive:backups --min-age 3d --include "moodle*.tar.gz"
 rclone delete gdrive:backups --min-age 3d --include "moodle*.sql.gz"
+rclone delete gdrive:backups --min-age 3d --include "moodledata*.tar.gz.part*"
 
-time rclone sync /home/user/domains/private gdrive:backups/moodledata \
-  --exclude "cache/**" \
-  --exclude "localcache/**" \
-  --exclude "temp/**" \
-  --exclude "trashdir/**" \
-  --exclude "lock/**" \
-  --transfers=2 \
-  --checkers=4 \
-  --retries 5 \
-  --log-file=/var/log/rclone-backup.log \
-  --log-level INFO
+rclone copy /home/user/domains/backup/moodle_${DATE}.tar.gz gdrive:backups
+rclone copy /home/user/domains/backup/moodle_${DATE}.sql.gz gdrive:backups
+for f in /home/user/domains/backup/moodledata_${DATE}.tar.gz.part*; do
+  rclone copy "$f" gdrive:backups \
+    --log-file=/home/user/domains/backup/rclone-backup.log \
+    --log-level INFO
+  sleep 10
+done
+
